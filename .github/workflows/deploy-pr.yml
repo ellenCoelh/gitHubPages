@@ -24,6 +24,15 @@ jobs:
       - name: Install dependencies
         run: yarn install
 
+      - name: Set deployment subdir
+        id: deploy-path
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "DEPLOY_SUBDIR=/pr-${{ github.event.pull_request.number }}" >> $GITHUB_ENV
+          else
+            echo "DEPLOY_SUBDIR=/" >> $GITHUB_ENV
+          fi
+
       - name: Build project
         run: yarn run build
 
