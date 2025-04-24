@@ -38,8 +38,8 @@ jobs:
             (mkdir -p gh-pages-tmp && cd gh-pages-tmp && git init && git checkout -b gh-pages)
 
           mkdir -p gh-pages-tmp/$SUBDIR
-          rm -rf gh-pages-tmp/$SUBDIR/*
-          cp -R build/* gh-pages-tmp/$SUBDIR/
+          rm -rf gh-pages-tmp/$SUBDIR
+          cp -R build gh-pages-tmp/$SUBDIR
 
           cd gh-pages-tmp
           git config user.name "GitHub Actions Deploy"
@@ -50,7 +50,7 @@ jobs:
 
       - name: Comment with Preview URL
         env:
-          GH_COMMENT_TOKEN: ${{ secrets.GH_PAGES_TOKEN }
+          GH_COMMENT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
           OWNER: ${{ github.repository_owner }}
