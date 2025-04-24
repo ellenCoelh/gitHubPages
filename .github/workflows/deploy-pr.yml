@@ -44,3 +44,16 @@ jobs:
           git add .
           git commit -m "Deploy PR#${{ github.event.pull_request.number }} to /$SUBDIR [skip ci]" --allow-empty
           git push -f $REPO gh-pages
+
+      - name: Comment with Preview URL
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          COMMENT="Preview disponível em: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr-${PR_NUMBER}/"
+          curl -s -H "Authorization: token $GH_TOKEN" \
+               -H "Content-Type: application/json" \
+               -X POST \
+               -d "{\"body\": \"$COMMENT\"}" \
+               "https://api.github.com/repos/$REPO/issues/$PR_NUMBER/comments"
