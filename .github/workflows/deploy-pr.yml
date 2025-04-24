@@ -50,7 +50,7 @@ jobs:
 
       - name: Comment with Preview URL
         env:
-          GH_TOKEN: ${{ secrets.GH_PAGES_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
           OWNER: ${{ github.repository_owner }}
@@ -63,6 +63,8 @@ jobs:
                -X POST \
                -d "{\"body\": \"$COMMENT\"}" \
                "https://api.github.com/repos/$REPO/issues/$PR_NUMBER/comments"
+<<<<<<< HEAD
+=======
 
   deploy-main:
     if: github.ref == 'refs/heads/main'
@@ -101,3 +103,4 @@ jobs:
           git add .
           git commit -m "Deploy from main branch [skip ci]" --allow-empty
           git push -f $REPO gh-pages
+>>>>>>> origin/main
