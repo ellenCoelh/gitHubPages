@@ -1,113 +1,103 @@
-name: Deploy PR Preview and Production
+name: Deploy to GitHub Pages
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
   push:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
-  deploy-preview:
+  deploy-pr:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Node.js and Yarn
         uses: actions/setup-node@v3
         with:
           node-version: 18
+          cache: "yarn"
 
       - name: Install dependencies
         run: yarn install
 
       - name: Build project
-        run: yarn build
+        run: yarn run build
 
-      - name: Create PR subdirectory
+      - name: Deploy PR to GH Pages (Subdirectory)
+        env:
+          GH_PAGES_TOKEN: ${{ secrets.GH_PAGES_TOKEN }}
         run: |
-          mkdir -p public/pr-${{ github.event.pull_request.number }}
-          cp -r build/* public/pr-${{ github.event.pull_request.number }}/
+          REPO="https://${{ github.actor }}:${{ secrets.GH_PAGES_TOKEN }}@github.com/${{ github.repository }}.git"
+          SUBDIR="pr-${{ github.event.pull_request.number }}"
 
-      - name: Deploy PR Preview
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./public
-          destination_dir: pr-${{ github.event.pull_request.number }}
-          keep_files: true
+          git clone --branch gh-pages --single-branch $REPO gh-pages-tmp || \
+            (mkdir -p gh-pages-tmp && cd gh-pages-tmp && git init && git checkout -b gh-pages)
 
-      - name: Add Preview URL comment
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const repo = context.repo
-            const prNumber = context.payload.pull_request.number
-            const previewUrl = `https://${repo.owner}.github.io/${repo.repo}/pr-${prNumber}/`
+          mkdir -p gh-pages-tmp/$SUBDIR
+          rm -rf gh-pages-tmp/$SUBDIR/*
+          cp -R build/* gh-pages-tmp/$SUBDIR/
 
-            await github.rest.issues.createComment({
-              ...repo,
-              issue_number: prNumber,
-              body: `**Preview disponível:** [Acesse aqui](${previewUrl})\n\nEsta é uma prévia do seu PR. O link será válido até o PR ser fechado ou mesclado.`
-            })
+          cd gh-pages-tmp
+          git config user.name "GitHub Actions Deploy"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add .
+          git commit -m "Deploy PR#${{ github.event.pull_request.number }} to /$SUBDIR [skip ci]" --allow-empty
+          git push -f $REPO gh-pages
 
-  deploy-production:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Comment with Preview URL
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAGES_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          COMMENT="Deploy disponível em: https://${OWNER}.github.io/${REPO_NAME}/pr-${PR_NUMBER}/"
+          echo "Comentando na PR: $COMMENT"
+          curl -s -H "Authorization: token $GH_TOKEN" \
+               -H "Content-Type: application/json" \
+               -X POST \
+               -d "{\"body\": \"$COMMENT\"}" \
+               "https://api.github.com/repos/$REPO/issues/$PR_NUMBER/comments"
+
+  deploy-main:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Node.js and Yarn
         uses: actions/setup-node@v3
         with:
           node-version: 18
+          cache: "yarn"
 
       - name: Install dependencies
         run: yarn install
 
       - name: Build project
-        run: yarn build
+        run: yarn run build
 
-      - name: Deploy to Production
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./build
-          keep_files: false
+      - name: Deploy main to GH Pages root
+        env:
+          GH_PAGES_TOKEN: ${{ secrets.GH_PAGES_TOKEN }}
+        run: |
+          REPO="https://${{ github.actor }}:${{ secrets.GH_PAGES_TOKEN }}@github.com/${{ github.repository }}.git"
 
-      - name: Find Related PRs and Notify
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const repo = context.repo
-            const productionUrl = `https://${repo.owner}.github.io/${repo.repo}/`
+          git clone --branch gh-pages --single-branch $REPO gh-pages-tmp || \
+            (mkdir -p gh-pages-tmp && cd gh-pages-tmp && git init && git checkout -b gh-pages)
 
-            // Busca PRs associados a este commit
-            const prsResponse = await github.rest.repos.listPullRequestsAssociatedWithCommit({
-              ...repo,
-              commit_sha: context.sha
-            })
+          rm -rf gh-pages-tmp/*
+          cp -R build/* gh-pages-tmp/
 
-            // Notifica cada PR mesclado
-            for (const pr of prsResponse.data) {
-              if (pr.merged_at) {
-                await github.rest.issues.createComment({
-                  ...repo,
-                  issue_number: pr.number,
-                  body: `**Deploy em produção realizado!**\n\nSua alteração está agora disponível em: [${productionUrl}](${productionUrl})`
-                })
-                
-                // Adiciona label ao PR
-                try {
-                  await github.rest.issues.addLabels({
-                    ...repo,
-                    issue_number: pr.number,
-                    labels: ['deployed']
-                  })
-                } catch (error) {
-                  console.log('Erro ao adicionar label:', error)
-                }
-              }
-            }
+          cd gh-pages-tmp
+          git config user.name "GitHub Actions Deploy"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add .
+          git commit -m "Deploy from main branch [skip ci]" --allow-empty
+          git push -f $REPO gh-pages
