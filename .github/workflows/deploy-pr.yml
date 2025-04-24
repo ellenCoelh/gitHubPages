@@ -24,14 +24,6 @@ jobs:
       - name: Install dependencies
         run: yarn install
 
-      - name: Set public URL
-        run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "PUBLIC_URL=/pr-${{ github.event.pull_request.number }}" >> $GITHUB_ENV
-          else
-            echo "PUBLIC_URL=/" >> $GITHUB_ENV
-          fi
-
       - name: Build project
         run: yarn run build
 
@@ -58,8 +50,7 @@ jobs:
 
       - name: Comment with Preview URL
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_PAGES_TOKEN: ${{ secrets.GH_PAGES_TOKEN }}
+          GH_COMMENT_TOKEN: ${{ secrets.GH_PAGES_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
           OWNER: ${{ github.repository_owner }}
@@ -67,7 +58,7 @@ jobs:
         run: |
           COMMENT="Deploy disponível em: https://${OWNER}.github.io/${REPO_NAME}/pr-${PR_NUMBER}/"
           echo "Comentando na PR: $COMMENT"
-          curl -s -H "Authorization: token $GH_PAGES_TOKEN" \
+          curl -s -H "Authorization: token $GH_COMMENT_TOKEN" \
                -H "Content-Type: application/json" \
                -X POST \
                -d "{\"body\": \"$COMMENT\"}" \
