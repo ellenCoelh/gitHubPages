@@ -1,11 +1,14 @@
-name: Deploy PR to GitHub Pages (Subdirectory)
+name: GitHub Pages Deploy
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
 
 jobs:
-  deploy:
+  pr-preview:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -22,25 +25,98 @@ jobs:
       - name: Build project
         run: yarn run build
 
-      - name: Deploy to GH Pages (Subdirectory)
+      - name: Deploy PR Preview
         run: |
-          # Configurações iniciais
           REPO="https://${{ github.actor }}:${{ secrets.GH_PAGES_TOKEN }}@github.com/${{ github.repository }}.git"
           SUBDIR="pr-${{ github.event.pull_request.number }}"
 
-          # Clona o branch gh-pages para uma pasta temporária
           git clone --branch gh-pages --single-branch $REPO gh-pages-tmp || \
             (mkdir -p gh-pages-tmp && cd gh-pages-tmp && git init && git checkout -b gh-pages)
 
-          # Move o build para o subdiretório
           mkdir -p gh-pages-tmp/$SUBDIR
           rm -rf gh-pages-tmp/$SUBDIR/*
           cp -R build/* gh-pages-tmp/$SUBDIR/
 
-          # Faz commit e push das alterações
           cd gh-pages-tmp
           git config user.name "GitHub Actions Deploy"
           git config user.email "github-actions@users.noreply.github.com"
           git add .
           git commit -m "Deploy PR#${{ github.event.pull_request.number }} to /$SUBDIR [skip ci]" --allow-empty
           git push -f $REPO gh-pages
+
+      - name: Add Preview URL to PR
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const repo = context.repo
+            const prNumber = context.payload.pull_request.number
+            const previewUrl = `https://${repo.owner}.github.io/${repo.repo}/pr-${prNumber}/`
+
+            github.rest.issues.createComment({
+              ...repo,
+              issue_number: prNumber,
+              body: `🚀 Preview disponível em: ${previewUrl}`
+            })
+
+  production-deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Node.js and Yarn
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Build project
+        run: yarn run build
+
+      - name: Deploy to Production
+        run: |
+          REPO="https://${{ github.actor }}:${{ secrets.GH_PAGES_TOKEN }}@github.com/${{ github.repository }}.git"
+
+          git clone --branch gh-pages --single-branch $REPO gh-pages-tmp || \
+            (mkdir -p gh-pages-tmp && cd gh-pages-tmp && git init && git checkout -b gh-pages)
+
+          rm -rf gh-pages-tmp/*
+          cp -R build/* gh-pages-tmp/
+
+          cd gh-pages-tmp
+          git config user.name "GitHub Actions Deploy"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add .
+          git commit -m "Deploy production [skip ci]" --allow-empty
+          git push -f $REPO gh-pages
+
+      - name: Find Related PRs and Notify
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const repo = context.repo
+            const productionUrl = `https://${repo.owner}.github.io/${repo.repo}/`
+
+            // Busca PRs mergeados recentemente que levaram a este deploy
+            const commits = await github.rest.repos.getCommit({
+              ...repo,
+              ref: context.sha
+            })
+
+            const prs = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              ...repo,
+              commit_sha: context.sha
+            })
+
+            for (const pr of prs.data) {
+              if (pr.state === 'closed') {
+                github.rest.issues.createComment({
+                  ...repo,
+                  issue_number: pr.number,
+                  body: `Alterações foram publicadas em produção. Acesse: ${productionUrl}`
+                })
+              }
+            }
