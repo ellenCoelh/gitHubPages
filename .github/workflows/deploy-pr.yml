@@ -1,35 +1,46 @@
-name: Deploy PR Preview
+name: Deploy PR to GitHub Pages (Subdirectory)
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
 
 jobs:
-  deploy-preview:
+  deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v2
 
-      - name: Setup Node.js
+      - name: Setup Node.js and Yarn
         uses: actions/setup-node@v3
         with:
           node-version: 18
+          cache: "yarn"
 
       - name: Install dependencies
-        run: yarn install # ou npm install
+        run: yarn install
 
       - name: Build project
-        run: yarn build # ou npm run build
+        run: yarn run build
 
-      - name: Create PR subdirectory
+      - name: Deploy to GH Pages (Subdirectory)
         run: |
-          mkdir -p public/pr-${{ github.event.pull_request.number }}
-          cp -r build/* public/pr-${{ github.event.pull_request.number }}/
+          # Configurações iniciais
+          REPO="https://${{ github.actor }}:${{ secrets.GH_PAGES_TOKEN }}@github.com/${{ github.repository }}.git"
+          SUBDIR="pr-${{ github.event.pull_request.number }}"
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./public
-          destination_dir: pr-${{ github.event.pull_request.number }}
-          keep_files: true
+          # Clona o branch gh-pages para uma pasta temporária
+          git clone --branch gh-pages --single-branch $REPO gh-pages-tmp || \
+            (mkdir -p gh-pages-tmp && cd gh-pages-tmp && git init && git checkout -b gh-pages)
+
+          # Move o build para o subdiretório
+          mkdir -p gh-pages-tmp/$SUBDIR
+          rm -rf gh-pages-tmp/$SUBDIR/*
+          cp -R build/* gh-pages-tmp/$SUBDIR/
+
+          # Faz commit e push das alterações
+          cd gh-pages-tmp
+          git config user.name "GitHub Actions Deploy"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add .
+          git commit -m "Deploy PR#${{ github.event.pull_request.number }} to /$SUBDIR [skip ci]" --allow-empty
+          git push -f $REPO gh-pages
