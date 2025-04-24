@@ -1,34 +1,35 @@
-name: Deploy PR to GitHub Pages
+name: Deploy PR Preview
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
 
 jobs:
-  deploy:
+  deploy-preview:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js and Yarn
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18
-          cache: "yarn"
 
       - name: Install dependencies
-        run: yarn install
+        run: yarn install # ou npm install
 
       - name: Build project
-        run: yarn run build
+        run: yarn build # ou npm run build
 
-      - name: Deploy to GH Pages
+      - name: Create PR subdirectory
         run: |
-          cd build
-          git init
-          git config user.name "GitHub Actions Deploy"
-          git config user.email "github-actions@users.noreply.github.com"
-          git checkout -b gh-pages
-          git add .
-          git commit -m "Deploy PR#${{ github.event.pull_request.number }} [skip ci]" --allow-empty
-          git push -f https://${{ github.actor }}:${{ secrets.GH_PAGES_TOKEN }}@github.com/${{ github.repository }}.git gh-pages
+          mkdir -p public/pr-${{ github.event.pull_request.number }}
+          cp -r build/* public/pr-${{ github.event.pull_request.number }}/
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
+          destination_dir: pr-${{ github.event.pull_request.number }}
+          keep_files: true
