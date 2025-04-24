@@ -24,13 +24,12 @@ jobs:
       - name: Install dependencies
         run: yarn install
 
-      - name: Set deployment subdir
-        id: deploy-path
+      - name: Set public URL
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "DEPLOY_SUBDIR=/pr-${{ github.event.pull_request.number }}" >> $GITHUB_ENV
+            echo "PUBLIC_URL=/pr-${{ github.event.pull_request.number }}" >> $GITHUB_ENV
           else
-            echo "DEPLOY_SUBDIR=/" >> $GITHUB_ENV
+            echo "PUBLIC_URL=/" >> $GITHUB_ENV
           fi
 
       - name: Build project
