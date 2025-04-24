@@ -50,7 +50,7 @@ jobs:
 
       - name: Comment with Preview URL
         env:
-          GH_COMMENT_TOKEN: ${{ secrets.GH_PAGES_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAGES_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
           OWNER: ${{ github.repository_owner }}
@@ -58,7 +58,7 @@ jobs:
         run: |
           COMMENT="Deploy disponível em: https://${OWNER}.github.io/${REPO_NAME}/pr-${PR_NUMBER}/"
           echo "Comentando na PR: $COMMENT"
-          curl -s -H "Authorization: token $GH_COMMENT_TOKEN" \
+          curl -s -H "Authorization: token $GH_TOKEN" \
                -H "Content-Type: application/json" \
                -X POST \
                -d "{\"body\": \"$COMMENT\"}" \
