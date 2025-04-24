@@ -93,7 +93,7 @@ jobs:
 
       - name: Set homepage for main branch
         run: |
-          jq '.homepage = "/${{ github.event.repository.name }}/"' package.json > tmp.json && mv tmp.json package.json
+          jq '.homepage = "/${{ github.event.repository.name }}/gitHubPages/"' package.json > tmp.json && mv tmp.json package.json
 
       - name: Build project
         run: yarn run build
