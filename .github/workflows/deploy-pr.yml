@@ -26,6 +26,8 @@ jobs:
         run: |
           cd build
           git init
+          git config user.name "GitHub Actions Deploy"
+          git config user.email "github-actions@users.noreply.github.com"
           git checkout -b gh-pages
           git add .
           git commit -m "Deploy PR#${{ github.event.pull_request.number }} [skip ci]" --allow-empty
