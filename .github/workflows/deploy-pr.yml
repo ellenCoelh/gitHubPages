@@ -15,6 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
       - name: Setup Node.js and Yarn
         uses: actions/setup-node@v3
         with:
@@ -23,6 +26,11 @@ jobs:
 
       - name: Install dependencies
         run: yarn install
+
+      - name: Set homepage dynamically for PR
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          jq --arg pr "/pr-$PR_NUMBER/" '.homepage = $pr' package.json > tmp.json && mv tmp.json package.json
 
       - name: Build project
         run: yarn run build
@@ -38,8 +46,8 @@ jobs:
             (mkdir -p gh-pages-tmp && cd gh-pages-tmp && git init && git checkout -b gh-pages)
 
           mkdir -p gh-pages-tmp/$SUBDIR
-          rm -rf gh-pages-tmp/$SUBDIR
-          cp -R build gh-pages-tmp/$SUBDIR
+          rm -rf gh-pages-tmp/$SUBDIR/*
+          cp -R build/* gh-pages-tmp/$SUBDIR/
 
           cd gh-pages-tmp
           git config user.name "GitHub Actions Deploy"
@@ -50,13 +58,13 @@ jobs:
 
       - name: Comment with Preview URL
         env:
-          GH_COMMENT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_COMMENT_TOKEN: ${{ secrets.GH_PAGES_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
           OWNER: ${{ github.repository_owner }}
           REPO_NAME: ${{ github.event.repository.name }}
         run: |
-          COMMENT="Deploy disponível em: https://${OWNER}.github.io/${REPO_NAME}/pr-${PR_NUMBER}/"
+          COMMENT="Preview disponível em: https://${OWNER}.github.io/${REPO_NAME}/pr-${PR_NUMBER}/"
           echo "Comentando na PR: $COMMENT"
           curl -s -H "Authorization: token $GH_COMMENT_TOKEN" \
                -H "Content-Type: application/json" \
@@ -71,6 +79,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
       - name: Setup Node.js and Yarn
         uses: actions/setup-node@v3
         with:
@@ -79,6 +90,10 @@ jobs:
 
       - name: Install dependencies
         run: yarn install
+
+      - name: Set homepage for main branch
+        run: |
+          jq '.homepage = "/${{ github.event.repository.name }}/"' package.json > tmp.json && mv tmp.json package.json
 
       - name: Build project
         run: yarn run build
